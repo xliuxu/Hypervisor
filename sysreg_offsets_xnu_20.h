@@ -1,3 +1,7 @@
+case HV_SYS_REG_DBGBVR0_EL1:
+  o = 0x448;
+  f = 2;
+  break;
 case HV_SYS_REG_DBGBCR0_EL1:
   o = 0x450;
   f = 2;
