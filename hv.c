@@ -1,5 +1,6 @@
 // Decompiled by hand (based-ish on a Ghidra decompile) from Hypervisor.framework on macOS 12.0b1
-// 06/09/22: updated for 12.5.1
+// 06/09/22: updated for macOS 12.5.1
+// 15/09/22: added offsets for macOS 11.6.5
 #include <assert.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -92,22 +93,24 @@ static hv_return_t _hv_vcpu_config_get_feature_regs(
   if (err) {
     return err;
   }
-  feature_regs->aa64dfr0_el1 = MODIFY_FLAGS_AA64DFR0_EL1(caps->id_aa64dfr0_el1);
-  feature_regs->aa64dfr1_el1 = MODIFY_FLAGS_AA64DFR1_EL1(caps->id_aa64dfr1_el1);
-  feature_regs->aa64isar0_el1 = MODIFY_FLAGS_AA64ISAR0_EL1(caps->id_aa64isar0_el1);
-  feature_regs->aa64isar1_el1 = MODIFY_FLAGS_AA64ISAR1_EL1(caps->id_aa64isar1_el1);
-  feature_regs->aa64mmfr0_el1 = MODIFY_FLAGS_AA64MMFR0_EL1(caps->id_aa64mmfr0_el1);
-  feature_regs->aa64mmfr1_el1 = MODIFY_FLAGS_AA64MMFR1_EL1(caps->id_aa64mmfr1_el1);
-  feature_regs->aa64mmfr2_el1 = MODIFY_FLAGS_AA64MMFR2_EL1(caps->id_aa64mmfr2_el1);
-  feature_regs->aa64pfr0_el1 = MODIFY_FLAGS_AA64PFR0_EL1(caps->id_aa64pfr0_el1);
-  feature_regs->aa64pfr1_el1 = MODIFY_FLAGS_AA64PFR1_EL1(caps->id_aa64pfr1_el1);
-  feature_regs->ctr_el0 = MODIFY_FLAGS_CTR_EL0(caps->ctr_el0);
-  feature_regs->dczid_el0 = MODIFY_FLAGS_DCZID_EL0(caps->dczid_el0);
-  feature_regs->clidr_el1 = MODIFY_FLAGS_CLIDR_EL1(caps->clidr_el1);
-  static_assert(sizeof(feature_regs->ccsidr_el1_inst) == sizeof(caps->ccsidr_el1_inst), "ccsidr_el1_inst size");
-  memcpy(feature_regs->ccsidr_el1_inst, caps->ccsidr_el1_inst, sizeof(feature_regs->ccsidr_el1_inst));
-  static_assert(sizeof(feature_regs->ccsidr_el1_data_or_unified) == sizeof(caps->ccsidr_el1_data_or_unified), "ccsidr_el1_data_or_unified size");
-  memcpy(feature_regs->ccsidr_el1_data_or_unified, caps->ccsidr_el1_data_or_unified, sizeof(feature_regs->ccsidr_el1_data_or_unified));
+  feature_regs->aa64dfr0_el1 = MODIFY_FLAGS_AA64DFR0_EL1(ACCESS(caps, id_aa64dfr0_el1));
+  feature_regs->aa64dfr1_el1 = MODIFY_FLAGS_AA64DFR1_EL1(ACCESS(caps, id_aa64dfr1_el1));
+  feature_regs->aa64isar0_el1 = MODIFY_FLAGS_AA64ISAR0_EL1(ACCESS(caps, id_aa64isar0_el1));
+  feature_regs->aa64isar1_el1 = MODIFY_FLAGS_AA64ISAR1_EL1(ACCESS(caps, id_aa64isar1_el1));
+  feature_regs->aa64mmfr0_el1 = MODIFY_FLAGS_AA64MMFR0_EL1(ACCESS(caps, id_aa64mmfr0_el1));
+  feature_regs->aa64mmfr1_el1 = MODIFY_FLAGS_AA64MMFR1_EL1(ACCESS(caps, id_aa64mmfr1_el1));
+  feature_regs->aa64mmfr2_el1 = MODIFY_FLAGS_AA64MMFR2_EL1(ACCESS(caps, id_aa64mmfr2_el1));
+  feature_regs->aa64pfr0_el1 = MODIFY_FLAGS_AA64PFR0_EL1(ACCESS(caps, id_aa64pfr0_el1));
+  feature_regs->aa64pfr1_el1 = MODIFY_FLAGS_AA64PFR1_EL1(ACCESS(caps, id_aa64pfr1_el1));
+  feature_regs->ctr_el0 = MODIFY_FLAGS_CTR_EL0(ACCESS(caps, ctr_el0));
+  feature_regs->dczid_el0 = MODIFY_FLAGS_DCZID_EL0(ACCESS(caps, dczid_el0));
+  feature_regs->clidr_el1 = MODIFY_FLAGS_CLIDR_EL1(ACCESS(caps, clidr_el1));
+  if (get_xnu_version() >= HV_VERSION_XNU_21) {
+    static_assert(sizeof(feature_regs->ccsidr_el1_inst) == sizeof(caps->v21.ccsidr_el1_inst), "ccsidr_el1_inst size");
+    memcpy(feature_regs->ccsidr_el1_inst, ACCESS(caps, ccsidr_el1_inst), sizeof(feature_regs->ccsidr_el1_inst));
+    static_assert(sizeof(feature_regs->ccsidr_el1_data_or_unified) == sizeof(caps->v21.ccsidr_el1_data_or_unified), "ccsidr_el1_data_or_unified size");
+    memcpy(feature_regs->ccsidr_el1_data_or_unified, ACCESS(caps, ccsidr_el1_data_or_unified), sizeof(feature_regs->ccsidr_el1_data_or_unified));
+  }
   return 0;
 }
 
@@ -204,9 +207,6 @@ struct hv_vcpu_create_kernel_args {
   struct hv_vcpu_zone* output_vcpu_zone;  // 0x8
 };
 
-// ' hyp', 0xe
-static const uint64_t kHvVcpuMagic = 0x206879700000000eull;
-
 struct hv_vcpu_config_private {
   char field_0[16];
   uint64_t vmkeylo_el2;
@@ -237,8 +237,9 @@ hv_return_t hv_vcpu_create(hv_vcpu_t* vcpu, hv_vcpu_exit_t** exit, hv_vcpu_confi
     return err;
   }
   printf("vcpu_zone = %p\n", args.output_vcpu_zone);
-  if (args.output_vcpu_zone->ro.ver != kHvVcpuMagic) {
-    printf("Invalid magic! expected %llx, got %llx\n", kHvVcpuMagic, args.output_vcpu_zone->ro.ver);
+  uint64_t expected_magic = get_expected_magic();
+  if (args.output_vcpu_zone->ro.ver != expected_magic) {
+    printf("Invalid magic! expected %llx, got %llx\n", expected_magic, args.output_vcpu_zone->ro.ver);
 #ifndef USE_KERNEL_BYPASS_CHECKS
     hv_trap(HV_CALL_VCPU_DESTROY, NULL);
     pthread_mutex_unlock(&vcpus_mutex);
@@ -248,6 +249,8 @@ hv_return_t hv_vcpu_create(hv_vcpu_t* vcpu, hv_vcpu_exit_t** exit, hv_vcpu_confi
 #endif
   }
   vcpu_data->vcpu_zone = args.output_vcpu_zone;
+  arm_guest_ro_context_t *ro = &vcpu_data->vcpu_zone->ro;
+  arm_guest_rw_context_t *rw = &vcpu_data->vcpu_zone->rw;
   *vcpu = cpuid;
   *exit = &vcpu_data->exit;
   pthread_mutex_unlock(&vcpus_mutex);
@@ -259,21 +262,21 @@ hv_return_t hv_vcpu_create(hv_vcpu_t* vcpu, hv_vcpu_exit_t** exit, hv_vcpu_confi
   }
 
   if (config) {
-    vcpu_data->vcpu_zone->rw.controls.vmkeylo_el2 = _config->vmkeylo_el2;
-    vcpu_data->vcpu_zone->rw.controls.vmkeyhi_el2 = _config->vmkeyhi_el2;
+    ACCESS(rw, controls.vmkeylo_el2) = _config->vmkeylo_el2;
+    ACCESS(rw, controls.vmkeyhi_el2) = _config->vmkeyhi_el2;
   }
 
   // Apple traps PMCCNTR_EL0 using this proprietary register, then translates the syndrome.
   // No, I don't know why Apple doesn't just use HDFGRTR_EL2 or MDCR_EL2
-  vcpu_data->vcpu_zone->rw.controls.hacr_el2 |= 1ull << 56;
+  ACCESS(rw, controls.hacr_el2) |= 1ull << 56;
   // TID3: trap the feature regs so we can handle these ourselves
-  vcpu_data->vcpu_zone->rw.controls.hcr_el2 |= 0x40000ull;
+  ACCESS(rw, controls.hcr_el2) |= 0x40000ull;
   // if ro hacr has a bit set, clear rw hcr_el2 TIDCP?!
-  if ((vcpu_data->vcpu_zone->ro.controls.hacr_el2 >> 4 & 1) != 0) {
-    vcpu_data->vcpu_zone->rw.controls.hcr_el2 &= ~0x100000;
+  if ((ACCESS(ro, controls.hacr_el2) >> 4 & 1) != 0) {
+    ACCESS(rw, controls.hcr_el2) &= ~0x100000;
   }
-  vcpu_data->vcpu_zone->rw.controls.hcr_el2 |= 0x80000;
-  vcpu_data->vcpu_zone->rw.state_dirty |= 0x4;
+  ACCESS(rw, controls.hcr_el2) |= 0x80000;
+  ACCESS(rw, state_dirty) |= 0x4;
   return 0;
 }
 
@@ -296,13 +299,15 @@ static void deliver_uncategorized_exception(struct hv_vcpu_data* vcpu_data);
 hv_return_t hv_vcpu_run(hv_vcpu_t vcpu) {
   // update registers
   struct hv_vcpu_data* vcpu_data = &vcpus[vcpu];
+  arm_guest_ro_context_t *ro = &vcpu_data->vcpu_zone->ro;
+  arm_guest_rw_context_t *rw = &vcpu_data->vcpu_zone->rw;
   bool injected_interrupt = false;
   if (vcpu_data->pending_interrupts) {
     injected_interrupt = true;
-    vcpu_data->vcpu_zone->rw.controls.hcr_el2 |= vcpu_data->pending_interrupts;
-    vcpu_data->vcpu_zone->rw.state_dirty |= 0x4;
+    ACCESS(rw, controls.hcr_el2) |= vcpu_data->pending_interrupts;
+    ACCESS(rw, state_dirty) |= 0x4;
   }
-  vcpu_data->timer_enabled = vcpu_data->vcpu_zone->rw.controls.timer & 1;
+  vcpu_data->timer_enabled = ACCESS(rw, controls.timer) & 1;
   while (true) {
     hv_return_t err = hv_trap(HV_CALL_VCPU_RUN, NULL);
     if (err) {
@@ -311,11 +316,11 @@ hv_return_t hv_vcpu_run(hv_vcpu_t vcpu) {
     bool print_vmexit = false;
     if (print_vmexit) {
       printf("exit = %d (esr = %x far = %llx hpfar = %llx)\n",
-             vcpu_data->vcpu_zone->ro.exit.vmexit_reason, vcpu_data->vcpu_zone->ro.exit.vmexit_esr,
-             vcpu_data->vcpu_zone->ro.exit.vmexit_far, vcpu_data->vcpu_zone->ro.exit.vmexit_hpfar);
+             ACCESS(ro, exit.vmexit_reason), ACCESS(ro, exit.vmexit_esr),
+             ACCESS(ro, exit.vmexit_far), ACCESS(ro, exit.vmexit_hpfar));
     }
     hv_vcpu_exit_t* exit = &vcpu_data->exit;
-    switch (vcpu_data->vcpu_zone->ro.exit.vmexit_reason) {
+    switch (ACCESS(ro, exit.vmexit_reason)) {
       case 0: {
         exit->reason = HV_EXIT_REASON_CANCELED;
         break;
@@ -330,10 +335,10 @@ hv_return_t hv_vcpu_run(hv_vcpu_t vcpu) {
       }
       case 3:
       case 4: {
-        if (!vcpu_data->timer_enabled && vcpu_data->vcpu_zone->rw.banked_sysregs.cntv_ctl_el0 == 5) {
+        if (!vcpu_data->timer_enabled && ACCESS(rw, banked_sysregs.cntv_ctl_el0) == 5) {
           exit->reason = HV_EXIT_REASON_VTIMER_ACTIVATED;
           // mask vtimer
-          vcpu_data->vcpu_zone->rw.controls.timer |= 1ull;
+          ACCESS(rw, controls.timer) |= 1ull;
         } else {
           exit->reason = HV_EXIT_REASON_UNKNOWN;
         }
@@ -354,8 +359,8 @@ hv_return_t hv_vcpu_run(hv_vcpu_t vcpu) {
     }
     if (injected_interrupt) {
       vcpu_data->pending_interrupts = 0;
-      vcpu_data->vcpu_zone->rw.controls.hcr_el2 &= ~0xc0ull;
-      vcpu_data->vcpu_zone->rw.state_dirty |= 0x4;
+      ACCESS(rw, controls.hcr_el2) &= ~0xc0ull;
+      ACCESS(rw, state_dirty) |= 0x4;
     }
     return 0;
   }
@@ -366,20 +371,21 @@ hv_return_t hv_vcpu_get_reg(hv_vcpu_t vcpu, hv_reg_t reg, uint64_t* value) {
     return HV_BAD_ARGUMENT;
   }
   struct hv_vcpu_zone* vcpu_zone = vcpus[vcpu].vcpu_zone;
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
   if (reg < HV_REG_FP) {
-    *value = vcpu_zone->rw.regs.x[reg];
+    *value = ACCESS(rw, regs.x[reg]);
   } else if (reg == HV_REG_FP) {
-    *value = vcpu_zone->rw.regs.fp;
+    *value = ACCESS(rw, regs.fp);
   } else if (reg == HV_REG_LR) {
-    *value = vcpu_zone->rw.regs.lr;
+    *value = ACCESS(rw, regs.lr);
   } else if (reg == HV_REG_PC) {
-    *value = vcpu_zone->rw.regs.pc;
+    *value = ACCESS(rw, regs.pc);
   } else if (reg == HV_REG_FPCR) {
-    *value = vcpu_zone->rw.neon.fpcr;
+    *value = ACCESS(rw, neon.fpcr);
   } else if (reg == HV_REG_FPSR) {
-    *value = vcpu_zone->rw.neon.fpsr;
+    *value = ACCESS(rw, neon.fpsr);
   } else if (reg == HV_REG_CPSR) {
-    *value = vcpu_zone->rw.regs.cpsr;
+    *value = ACCESS(rw, regs.cpsr);
   }
   return 0;
 }
@@ -389,20 +395,21 @@ hv_return_t hv_vcpu_set_reg(hv_vcpu_t vcpu, hv_reg_t reg, uint64_t value) {
     return HV_BAD_ARGUMENT;
   }
   struct hv_vcpu_zone* vcpu_zone = vcpus[vcpu].vcpu_zone;
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
   if (reg < HV_REG_FP) {
-    vcpu_zone->rw.regs.x[reg] = value;
+    ACCESS(rw, regs.x[reg]) = value;
   } else if (reg == HV_REG_FP) {
-    vcpu_zone->rw.regs.lr = value;
+    ACCESS(rw, regs.lr) = value;
   } else if (reg == HV_REG_LR) {
-    vcpu_zone->rw.regs.lr = value;
+    ACCESS(rw, regs.lr) = value;
   } else if (reg == HV_REG_PC) {
-    vcpu_zone->rw.regs.pc = value;
+    ACCESS(rw, regs.pc) = value;
   } else if (reg == HV_REG_FPCR) {
-    vcpu_zone->rw.neon.fpcr = value;
+    ACCESS(rw, neon.fpcr) = value;
   } else if (reg == HV_REG_FPSR) {
-    vcpu_zone->rw.neon.fpsr = value;
+    ACCESS(rw, neon.fpsr) = value;
   } else if (reg == HV_REG_CPSR) {
-    vcpu_zone->rw.regs.cpsr = value;
+    ACCESS(rw, regs.cpsr) = value;
   }
   return 0;
 }
@@ -413,7 +420,8 @@ hv_return_t hv_vcpu_get_simd_fp_reg(hv_vcpu_t vcpu, hv_simd_fp_reg_t reg,
     return HV_BAD_ARGUMENT;
   }
   struct hv_vcpu_zone* vcpu_zone = vcpus[vcpu].vcpu_zone;
-  *((__uint128_t*)value) = vcpu_zone->rw.neon.q[reg];
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
+  *((__uint128_t*)value) = ACCESS(rw, neon.q[reg]);
   return 0;
 }
 
@@ -423,17 +431,28 @@ hv_return_t hv_vcpu_set_simd_fp_reg(hv_vcpu_t vcpu, hv_simd_fp_reg_t reg,
     return HV_BAD_ARGUMENT;
   }
   struct hv_vcpu_zone* vcpu_zone = vcpus[vcpu].vcpu_zone;
-  vcpu_zone->rw.neon.q[reg] = *((__uint128_t*)&value);
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
+  ACCESS(rw, neon.q[reg]) = *((__uint128_t*)&value);
   return 0;
 }
 
 static bool find_sys_reg(hv_sys_reg_t sys_reg, uint64_t* offset, uint64_t* sync_mask) {
   uint64_t o = 0;
   uint64_t f = 0;
-  switch (sys_reg) {
-#include "sysreg_offsets.h"
-    default:
-      return false;
+  if (get_xnu_version() == HV_VERSION_XNU_20) {
+    switch (sys_reg) {
+#include "sysreg_offsets_xnu_20.h"
+      default:
+        return false;
+    }
+  } else if (get_xnu_version() == HV_VERSION_XNU_21) {
+    switch (sys_reg) {
+#include "sysreg_offsets_xnu_21.h"
+      default:
+        return false;
+    }
+  } else {
+    return false;
   }
   *offset = o;
   *sync_mask = f;
@@ -447,12 +466,14 @@ hv_return_t hv_vcpu_get_sys_reg(hv_vcpu_t vcpu, hv_sys_reg_t sys_reg, uint64_t* 
   hv_return_t err;
   struct hv_vcpu_data* vcpu_data = &vcpus[vcpu];
   struct hv_vcpu_zone* vcpu_zone = vcpu_data->vcpu_zone;
+  arm_guest_ro_context_t *ro = &vcpu_zone->ro;
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
   switch (sys_reg) {
     case HV_SYS_REG_MIDR_EL1:
-      *value = vcpu_zone->rw.controls.vpidr_el2;
+      *value = ACCESS(rw, controls.vpidr_el2);
       return 0;
     case HV_SYS_REG_MPIDR_EL1:
-      *value = vcpu_zone->rw.controls.vmpidr_el2;
+      *value = ACCESS(rw, controls.vmpidr_el2);
       return 0;
     case HV_SYS_REG_ID_AA64PFR0_EL1:
       *value = vcpu_data->feature_regs.aa64pfr0_el1;
@@ -493,12 +514,12 @@ hv_return_t hv_vcpu_get_sys_reg(hv_vcpu_t vcpu, hv_sys_reg_t sys_reg, uint64_t* 
     return HV_BAD_ARGUMENT;
   }
   if ((sync_mask != 0) &&
-     ((vcpu_zone->rw.state_dirty & sync_mask) == 0 && (vcpu_zone->ro.state_valid & sync_mask) == 0)) {
+     ((ACCESS(rw, state_dirty) & sync_mask) == 0 && (ACCESS(ro, state_valid) & sync_mask) == 0)) {
     if ((err = hv_trap(HV_CALL_VCPU_SYSREGS_SYNC, 0)) != 0) {
       return err;
     }
   }
-  *value = *(uint64_t*)((char*)(&vcpu_zone->rw) + offset);
+  *value = *(uint64_t*)((char*)rw + offset);
   return 0;
 }
 
@@ -506,15 +527,17 @@ hv_return_t hv_vcpu_set_sys_reg(hv_vcpu_t vcpu, hv_sys_reg_t sys_reg, uint64_t v
   hv_return_t err;
   struct hv_vcpu_data* vcpu_data = &vcpus[vcpu];
   struct hv_vcpu_zone* vcpu_zone = vcpu_data->vcpu_zone;
+  arm_guest_ro_context_t *ro = &vcpu_zone->ro;
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
   switch (sys_reg) {
     case HV_SYS_REG_MIDR_EL1: {
-      vcpu_zone->rw.controls.vpidr_el2 = value;
-      vcpu_zone->rw.state_dirty |= 0x4;
+      ACCESS(rw, controls.vpidr_el2) = value;
+      ACCESS(rw, state_dirty) |= 0x4;
       return 0;
     }
     case HV_SYS_REG_MPIDR_EL1: {
-      vcpu_zone->rw.controls.vmpidr_el2 = value;
-      vcpu_zone->rw.state_dirty |= 0x4;
+      ACCESS(rw, controls.vmpidr_el2) = value;
+      ACCESS(rw, state_dirty) |= 0x4;
       return 0;
     }
       // the kernel doesn't set these - userspace traps and handles these
@@ -556,14 +579,14 @@ hv_return_t hv_vcpu_set_sys_reg(hv_vcpu_t vcpu, hv_sys_reg_t sys_reg, uint64_t v
     printf("invalid set sys reg: %x\n", sys_reg);
     return HV_BAD_ARGUMENT;
   }
-  if ((sync_mask != 0) && (((vcpu_zone->ro.state_valid & sync_mask) == 0))) {
+  if ((sync_mask != 0) && (((ACCESS(ro, state_valid) & sync_mask) == 0))) {
     if ((err = hv_trap(HV_CALL_VCPU_SYSREGS_SYNC, 0)) != 0) {
       return err;
     }
   }
-  *(uint64_t*)((char*)(&vcpu_zone->rw) + offset) = value;
+  *(uint64_t*)((char*)rw + offset) = value;
   if (sync_mask != 0) {
-    vcpu_zone->rw.state_dirty |= sync_mask;
+    ACCESS(rw, state_dirty) |= sync_mask;
   }
   return 0;
 }
@@ -573,26 +596,30 @@ hv_return_t hv_vcpu_get_vtimer_mask(hv_vcpu_t vcpu, bool* vtimer_is_masked) {
     return HV_BAD_ARGUMENT;
   }
   struct hv_vcpu_zone* vcpu_zone = vcpus[vcpu].vcpu_zone;
-  *vtimer_is_masked = vcpu_zone->rw.controls.timer & 1;
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
+  *vtimer_is_masked = ACCESS(rw, controls.timer) & 1;
   return 0;
 }
 
 hv_return_t hv_vcpu_set_vtimer_mask(hv_vcpu_t vcpu, bool vtimer_is_masked) {
   struct hv_vcpu_zone* vcpu_zone = vcpus[vcpu].vcpu_zone;
-  vcpu_zone->rw.controls.timer = (vcpu_zone->rw.controls.timer & ~1ull) | vtimer_is_masked;
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
+  ACCESS(rw, controls.timer) = (ACCESS(rw, controls.timer) & ~1ull) | vtimer_is_masked;
   return 0;
 }
 
 hv_return_t hv_vcpu_get_vtimer_offset(hv_vcpu_t vcpu, uint64_t* vtimer_offset) {
   struct hv_vcpu_zone* vcpu_zone = vcpus[vcpu].vcpu_zone;
-  *vtimer_offset = vcpu_zone->rw.controls.virtual_timer_offset;
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
+  *vtimer_offset = ACCESS(rw, controls.virtual_timer_offset);
   return 0;
 }
 
 hv_return_t hv_vcpu_set_vtimer_offset(hv_vcpu_t vcpu, uint64_t vtimer_offset) {
   struct hv_vcpu_zone* vcpu_zone = vcpus[vcpu].vcpu_zone;
-  vcpu_zone->rw.controls.virtual_timer_offset = vtimer_offset;
-  vcpu_zone->rw.state_dirty |= 0x4;
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
+  ACCESS(rw, controls.virtual_timer_offset) = vtimer_offset;
+  ACCESS(rw, state_dirty) |= 0x4;
   return 0;
 }
 
@@ -633,33 +660,37 @@ hv_return_t hv_vcpus_exit(hv_vcpu_t* vcpus, uint32_t vcpu_count) {
 
 void sync_and_dirty_banked_state(struct hv_vcpu_zone *vcpu_zone, uint64_t state)
 {
-  if (((vcpu_zone->ro.state_valid & state) == 0) && hv_trap(HV_CALL_VCPU_SYSREGS_SYNC, 0) != 0) {
+  arm_guest_ro_context_t *ro = &vcpu_zone->ro;
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
+  if (((ACCESS(ro, state_valid) & state) == 0) && hv_trap(HV_CALL_VCPU_SYSREGS_SYNC, 0) != 0) {
     assert(false);
   }
-  vcpu_zone->rw.state_dirty = vcpu_zone->rw.state_dirty | state;
+  ACCESS(rw, state_dirty) = ACCESS(rw, state_dirty) | state;
   return;
 }
 
 static bool deliver_msr_trap(struct hv_vcpu_data* vcpu_data, hv_vcpu_exit_t* exit) {
-  uint64_t esr = vcpu_data->vcpu_zone->ro.exit.vmexit_esr;
+  struct hv_vcpu_zone* vcpu_zone = vcpu_data->vcpu_zone;
+  arm_guest_ro_context_t *ro = &vcpu_zone->ro;
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
+  uint64_t esr = ACCESS(ro, exit.vmexit_esr);
   uint32_t reg = (esr >> 5) & 0x1f;
   uint32_t sysreg = esr & 0x3ffc1e;
-  struct hv_vcpu_zone* vcpu_zone = vcpu_data->vcpu_zone;
   if ((esr & 0x300000) == 0x200000) {
-    if ((vcpu_zone->rw.controls.mdcr_el2 >> 9 & 1) != 0) {
+    if ((ACCESS(rw, controls.mdcr_el2) >> 9 & 1) != 0) {
       return false;
     }
     if ((esr & 1) == 0) {
       switch (sysreg) {
         case 0x200004:
-          vcpu_zone->rw.dbgregs.mdccint_el1 = vcpu_zone->rw.regs.x[reg];
+          ACCESS(rw, dbgregs.mdccint_el1) = ACCESS(rw, regs.x[reg]);
           break;
         case 0x240000:
-          vcpu_zone->rw.dbgregs.osdtrrx_el1 = vcpu_zone->rw.regs.x[reg];
+          ACCESS(rw, dbgregs.osdtrrx_el1) = ACCESS(rw, regs.x[reg]);
           break;
         case 0x20c008:
         case 0x240006:
-          vcpu_zone->rw.dbgregs.osdtrtx_el1 = vcpu_zone->rw.regs.x[reg];
+          ACCESS(rw, dbgregs.osdtrtx_el1) = ACCESS(rw, regs.x[reg]);
           break;
         default:
           return false;
@@ -667,18 +698,18 @@ static bool deliver_msr_trap(struct hv_vcpu_data* vcpu_data, hv_vcpu_exit_t* exi
     } else {
       switch (sysreg) {
         case 0x200004:
-          vcpu_zone->rw.regs.x[reg] = vcpu_zone->rw.dbgregs.mdccint_el1;
+          ACCESS(rw, regs.x[reg]) = ACCESS(rw, dbgregs.mdccint_el1);
           break;
         case 0x20c008:
         case 0x20c00a:
         case 0x240000:
-          vcpu_zone->rw.regs.x[reg] = vcpu_zone->rw.dbgregs.osdtrrx_el1;
+          ACCESS(rw, regs.x[reg]) = ACCESS(rw, dbgregs.osdtrrx_el1);
           break;
         case 0x240006:
-          vcpu_zone->rw.regs.x[reg] = vcpu_zone->rw.dbgregs.osdtrtx_el1;
+          ACCESS(rw, regs.x[reg]) = ACCESS(rw, dbgregs.osdtrtx_el1);
           break;
         case 0x20c002:
-          vcpu_zone->rw.regs.x[reg] = 0;
+          ACCESS(rw, regs.x[reg]) = 0;
           break;
         default:
           return false;
@@ -707,151 +738,155 @@ static bool deliver_msr_trap(struct hv_vcpu_data* vcpu_data, hv_vcpu_exit_t* exi
       case 0x3c0002:
       case 0x3c0004:
       case 0x3e0002:
-        vcpu_zone->rw.regs.x[reg] = 0;
+        ACCESS(rw, regs.x[reg]) = 0;
         break;
       case 0x34000e:
-        vcpu_zone->rw.regs.x[reg] = vcpu_data->feature_regs.aa64mmfr2_el1;
+        ACCESS(rw, regs.x[reg]) = vcpu_data->feature_regs.aa64mmfr2_el1;
         break;
       case 0x300008:
-        vcpu_zone->rw.regs.x[reg] = vcpu_data->feature_regs.aa64pfr0_el1;
+        ACCESS(rw, regs.x[reg]) = vcpu_data->feature_regs.aa64pfr0_el1;
         break;
       case 0x30000a:
-        vcpu_zone->rw.regs.x[reg] = vcpu_data->feature_regs.aa64dfr0_el1;
+        ACCESS(rw, regs.x[reg]) = vcpu_data->feature_regs.aa64dfr0_el1;
         break;
       case 0x30000c:
-        vcpu_zone->rw.regs.x[reg] = vcpu_data->feature_regs.aa64isar0_el1;
+        ACCESS(rw, regs.x[reg]) = vcpu_data->feature_regs.aa64isar0_el1;
         break;
       case 0x30000e:
-        vcpu_zone->rw.regs.x[reg] = vcpu_data->feature_regs.aa64mmfr0_el1;
+        ACCESS(rw, regs.x[reg]) = vcpu_data->feature_regs.aa64mmfr0_el1;
         break;
       case 0x320008:
-        vcpu_zone->rw.regs.x[reg] = vcpu_data->feature_regs.aa64pfr1_el1;
+        ACCESS(rw, regs.x[reg]) = vcpu_data->feature_regs.aa64pfr1_el1;
         break;
       case 0x32000a:
-        vcpu_zone->rw.regs.x[reg] = vcpu_data->feature_regs.aa64dfr1_el1;
+        ACCESS(rw, regs.x[reg]) = vcpu_data->feature_regs.aa64dfr1_el1;
         break;
       case 0x32000c:
-        vcpu_zone->rw.regs.x[reg] = vcpu_data->feature_regs.aa64isar1_el1;
+        ACCESS(rw, regs.x[reg]) = vcpu_data->feature_regs.aa64isar1_el1;
         break;
       case 0x32000e:
-        vcpu_zone->rw.regs.x[reg] = vcpu_data->feature_regs.aa64mmfr1_el1;
+        ACCESS(rw, regs.x[reg]) = vcpu_data->feature_regs.aa64mmfr1_el1;
         break;
       default:
         return false;
     }
   }
-  vcpu_zone->rw.regs.pc += 4;
+  ACCESS(rw, regs.pc) += 4;
   return true;
 }
 
 static bool deliver_pac_trap(struct hv_vcpu_data* vcpu_data) {
-  uint64_t esr = vcpu_data->vcpu_zone->ro.exit.vmexit_esr;
   struct hv_vcpu_zone* vcpu_zone = vcpu_data->vcpu_zone;
+  arm_guest_ro_context_t *ro = &vcpu_zone->ro;
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
+  uint64_t esr = ACCESS(ro, exit.vmexit_esr);
   uint32_t uVar6;
   uint64_t uVar9;
 
   if (((esr & 0xffff) != 0) ||
-     ((vcpu_zone->rw.regs.x[0] & 0xff000000) != 0xc1000000)) {
+     ((ACCESS(rw, regs.x[0]) & 0xff000000) != 0xc1000000)) {
     return false;
   }
-  uVar6 = vcpu_zone->rw.regs.x[0] & 0xffffff;
-  if (((vcpu_zone->ro.controls.hacr_el2 >> 4 & 1) == 0) ||
+  uVar6 = ACCESS(rw, regs.x[0]) & 0xffffff;
+  if (((ACCESS(ro, controls.hacr_el2) >> 4 & 1) == 0) ||
      (6 < uVar6)) {
-    vcpu_zone->rw.regs.x[0] = 0xffffffff;
+    ACCESS(rw, regs.x[0]) = 0xffffffff;
     return true;
   }
   switch(uVar6) {
   default:
-    vcpu_zone->rw.extregs.apctl_el1 = 0x11;
+    ACCESS(rw, extregs.apctl_el1) = 0x11;
     sync_and_dirty_banked_state(vcpu_zone, 0x2000000000000000);
-    vcpu_zone->rw.extregs.apiakeylo_el1 = 0xfeedfacefeedfacf;
-    vcpu_zone->rw.extregs.apiakeyhi_el1 = 0xfeedfacefeedfad0;
-    vcpu_zone->rw.extregs.apdakeylo_el1 = 0xfeedfacefeedfad1;
-    vcpu_zone->rw.extregs.apdakeyhi_el1 = 0xfeedfacefeedfad2;
+    ACCESS(rw, extregs.apiakeylo_el1) = 0xfeedfacefeedfacf;
+    ACCESS(rw, extregs.apiakeyhi_el1) = 0xfeedfacefeedfad0;
+    ACCESS(rw, extregs.apdakeylo_el1) = 0xfeedfacefeedfad1;
+    ACCESS(rw, extregs.apdakeyhi_el1) = 0xfeedfacefeedfad2;
     sync_and_dirty_banked_state(vcpu_zone, 0x2000000000000000);
-    vcpu_zone->rw.extregs.apibkeylo_el1 = 0xfeedfacefeedfad5;
-    vcpu_zone->rw.extregs.apibkeyhi_el1 = 0xfeedfacefeedfad6;
-    vcpu_zone->rw.extregs.apdbkeylo_el1 = 0xfeedfacefeedfad7;
-    vcpu_zone->rw.extregs.apdbkeyhi_el1 = 0xfeedfacefeedfad8;
+    ACCESS(rw, extregs.apibkeylo_el1) = 0xfeedfacefeedfad5;
+    ACCESS(rw, extregs.apibkeyhi_el1) = 0xfeedfacefeedfad6;
+    ACCESS(rw, extregs.apdbkeylo_el1) = 0xfeedfacefeedfad7;
+    ACCESS(rw, extregs.apdbkeyhi_el1) = 0xfeedfacefeedfad8;
     sync_and_dirty_banked_state(vcpu_zone, 0x2000000000000000);
-    vcpu_zone->rw.extregs.apgakeylo_el1 = 0xfeedfacefeedfad9;
-    vcpu_zone->rw.extregs.apgakeyhi_el1 = 0xfeedfacefeedfada;
+    ACCESS(rw, extregs.apgakeylo_el1) = 0xfeedfacefeedfad9;
+    ACCESS(rw, extregs.apgakeyhi_el1) = 0xfeedfacefeedfada;
     sync_and_dirty_banked_state(vcpu_zone, 0x1000000000000000);
-    vcpu_zone->rw.extregs.kernkeylo_el1 = 0xfeedfacefeedfad3;
-    vcpu_zone->rw.extregs.kernkeyhi_el1 = 0xfeedfacefeedfad4;
+    ACCESS(rw, extregs.kernkeylo_el1) = 0xfeedfacefeedfad3;
+    ACCESS(rw, extregs.kernkeyhi_el1) = 0xfeedfacefeedfad4;
     break;
   case 1:
-    vcpu_zone->rw.regs.x[1] = 0xfeedfacefeedfacf;
-    vcpu_zone->rw.regs.x[0] = 0;
-    vcpu_zone->rw.regs.x[3] = 0xfeedfacefeedfad3;
-    vcpu_zone->rw.regs.x[2] = 0xfeedfacefeedfad5;
-    vcpu_zone->rw.regs.x[4] = 0xfeedfacefeedfad9;
+    ACCESS(rw, regs.x[1]) = 0xfeedfacefeedfacf;
+    ACCESS(rw, regs.x[0]) = 0;
+    ACCESS(rw, regs.x[3]) = 0xfeedfacefeedfad3;
+    ACCESS(rw, regs.x[2]) = 0xfeedfacefeedfad5;
+    ACCESS(rw, regs.x[4]) = 0xfeedfacefeedfad9;
     return true;
   case 2:
-    uVar9 = vcpu_zone->rw.regs.x[1];
+    uVar9 = ACCESS(rw, regs.x[1]);
     sync_and_dirty_banked_state(vcpu_zone, 0x2000000000000000);
-    vcpu_zone->rw.extregs.apiakeylo_el1 = uVar9;
-    vcpu_zone->rw.extregs.apiakeyhi_el1 = uVar9 + 1;
-    vcpu_zone->rw.extregs.apdakeylo_el1 = uVar9 + 2;
-    vcpu_zone->rw.extregs.apdakeyhi_el1 = uVar9 + 3;
+    ACCESS(rw, extregs.apiakeylo_el1) = uVar9;
+    ACCESS(rw, extregs.apiakeyhi_el1) = uVar9 + 1;
+    ACCESS(rw, extregs.apdakeylo_el1) = uVar9 + 2;
+    ACCESS(rw, extregs.apdakeyhi_el1) = uVar9 + 3;
     break;
   case 3:
-    uVar9 = vcpu_zone->rw.regs.x[1];
+    uVar9 = ACCESS(rw, regs.x[1]);
     sync_and_dirty_banked_state(vcpu_zone, 0x2000000000000000);
-    vcpu_zone->rw.extregs.apibkeylo_el1 = uVar9;
-    vcpu_zone->rw.extregs.apibkeyhi_el1 = uVar9 + 1;
-    vcpu_zone->rw.extregs.apdbkeylo_el1 = uVar9 + 2;
-    vcpu_zone->rw.extregs.apdbkeyhi_el1 = uVar9 + 3;
+    ACCESS(rw, extregs.apibkeylo_el1) = uVar9;
+    ACCESS(rw, extregs.apibkeyhi_el1) = uVar9 + 1;
+    ACCESS(rw, extregs.apdbkeylo_el1) = uVar9 + 2;
+    ACCESS(rw, extregs.apdbkeyhi_el1) = uVar9 + 3;
     break;
   case 4:
-    uVar9 = vcpu_zone->rw.regs.x[1];
+    uVar9 = ACCESS(rw, regs.x[1]);
     sync_and_dirty_banked_state(vcpu_zone, 0x1000000000000000);
-    vcpu_zone->rw.extregs.kernkeylo_el1 = uVar9;
-    vcpu_zone->rw.extregs.kernkeyhi_el1 = uVar9 + 1;
+    ACCESS(rw, extregs.kernkeylo_el1) = uVar9;
+    ACCESS(rw, extregs.kernkeyhi_el1) = uVar9 + 1;
     break;
   case 5:
-    uVar9 = vcpu_zone->rw.regs.x[2];
+    uVar9 = ACCESS(rw, regs.x[2]);
     sync_and_dirty_banked_state(vcpu_zone, 0x1000000000000000);
-    vcpu_zone->rw.extregs.kernkeylo_el1 = uVar9;
-    vcpu_zone->rw.extregs.kernkeyhi_el1 = uVar9 + 1;
-    uVar9 = vcpu_zone->rw.regs.x[1];
+    ACCESS(rw, extregs.kernkeylo_el1) = uVar9;
+    ACCESS(rw, extregs.kernkeyhi_el1) = uVar9 + 1;
+    uVar9 = ACCESS(rw, regs.x[1]);
     if (uVar9 == 0) {
-      vcpu_zone->rw.extregs.apctl_el1 = vcpu_zone->rw.extregs.apctl_el1 & 0xfffffffffffffffd;
+      ACCESS(rw, extregs.apctl_el1) = ACCESS(rw, extregs.apctl_el1) & 0xfffffffffffffffd;
     }
     else if (uVar9 == 1) {
-      vcpu_zone->rw.extregs.apctl_el1 = vcpu_zone->rw.extregs.apctl_el1 | 2;
+      ACCESS(rw, extregs.apctl_el1) = ACCESS(rw, extregs.apctl_el1) | 2;
     }
     break;
   case 6:
-    uVar9 = vcpu_zone->rw.regs.x[1];
+    uVar9 = ACCESS(rw, regs.x[1]);
     sync_and_dirty_banked_state(vcpu_zone, 0x2000000000000000);
-    vcpu_zone->rw.extregs.apgakeylo_el1 = uVar9;
-    vcpu_zone->rw.extregs.apgakeyhi_el1 = uVar9 + 1;
+    ACCESS(rw, extregs.apgakeylo_el1) = uVar9;
+    ACCESS(rw, extregs.apgakeyhi_el1) = uVar9 + 1;
     break;
   }
-  vcpu_zone->rw.regs.x[0] = 0;
+  ACCESS(rw, regs.x[0]) = 0;
   return true;
 }
 
 static bool deliver_ordinary_exception(struct hv_vcpu_data* vcpu_data, hv_vcpu_exit_t* exit) {
-  uint64_t esr = vcpu_data->vcpu_zone->ro.exit.vmexit_esr;
   struct hv_vcpu_zone* vcpu_zone = vcpu_data->vcpu_zone;
+  arm_guest_ro_context_t *ro = &vcpu_zone->ro;
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
+  uint64_t esr = ACCESS(ro, exit.vmexit_esr);
 
   exit->reason = HV_EXIT_REASON_EXCEPTION;
   exit->exception.syndrome = esr;
-  exit->exception.virtual_address = vcpu_data->vcpu_zone->ro.exit.vmexit_far;
-  exit->exception.physical_address = vcpu_data->vcpu_zone->ro.exit.vmexit_hpfar;
+  exit->exception.virtual_address = ACCESS(ro, exit.vmexit_far);
+  exit->exception.physical_address = ACCESS(ro, exit.vmexit_hpfar);
   
   if ((esr >> 26) == 0x16) {
     return deliver_pac_trap(vcpu_data);
   } else if ((esr >> 26) == 0x3f) {
-    if (vcpu_zone->ro.exit.vmexit_reason != 8) {
+    if (ACCESS(ro, exit.vmexit_reason) != 8) {
       deliver_uncategorized_exception(vcpu_data);
       return true;
     }
-    uint64_t exit_instr = vcpu_zone->ro.exit.vmexit_instr;
+    uint64_t exit_instr = ACCESS(ro, exit.vmexit_instr);
     if (((exit_instr ^ 0xffffffff) & 0x302c00) == 0) {
-      if ((vcpu_zone->ro.controls.hacr_el2 >> 4 & 1) != 0) {
+      if ((ACCESS(ro, controls.hacr_el2) >> 4 & 1) != 0) {
         deliver_uncategorized_exception(vcpu_data);
         return true;
       }
@@ -859,9 +894,9 @@ static bool deliver_ordinary_exception(struct hv_vcpu_data* vcpu_data, hv_vcpu_e
       exit->exception.syndrome = exit_instr & 0xffff | 0x5e000000;
     } else {
       if (((exit_instr & 0x3ffc1e) == 0x3e4000) &&
-         ((vcpu_zone->ro.controls.hacr_el2 >> 4 & 1) != 0)) {
-        vcpu_zone->rw.regs.x[((exit_instr >> 5) & 0x1f)] = 0x980200;
-        vcpu_zone->rw.regs.pc += 4;
+         ((ACCESS(ro, controls.hacr_el2) >> 4 & 1) != 0)) {
+        ACCESS(rw, regs.x[((exit_instr >> 5) & 0x1f)]) = 0x980200;
+        ACCESS(rw, regs.pc) += 4;
         return true;
       }
       exit->exception.syndrome = exit_instr & 0x1ffffff | 0x62000000;
@@ -875,15 +910,16 @@ static bool deliver_ordinary_exception(struct hv_vcpu_data* vcpu_data, hv_vcpu_e
 
 static void deliver_uncategorized_exception(struct hv_vcpu_data* vcpu_data) {
   struct hv_vcpu_zone* vcpu_zone = vcpu_data->vcpu_zone;
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
   uint64_t cpsr, vbar_el1, pc;
 
   sync_and_dirty_banked_state(vcpu_zone, 1);
-  vcpu_zone->rw.banked_sysregs.elr_el1 = vcpu_zone->rw.regs.pc;
-  vcpu_zone->rw.banked_sysregs.esr_el1 = 0x2000000;
-  vcpu_zone->rw.banked_sysregs.spsr_el1 = vcpu_zone->rw.regs.cpsr;
-  cpsr = vcpu_zone->rw.regs.cpsr;
+  ACCESS(rw, banked_sysregs.elr_el1) = ACCESS(rw, regs.pc);
+  ACCESS(rw, banked_sysregs.esr_el1) = 0x2000000;
+  ACCESS(rw, banked_sysregs.spsr_el1) = ACCESS(rw, regs.cpsr);
+  cpsr = ACCESS(rw, regs.cpsr);
   assert((cpsr >> 4 & 1) == 0); // (m & SPSR_MODE_RW_32) == 0
-  vbar_el1 = vcpu_zone->rw.banked_sysregs.vbar_el1;
+  vbar_el1 = ACCESS(rw, banked_sysregs.vbar_el1);
   pc = vbar_el1;
   if ((cpsr & 1) != 0) {
     pc = vbar_el1 + 0x200;
@@ -891,7 +927,7 @@ static void deliver_uncategorized_exception(struct hv_vcpu_data* vcpu_data) {
   if ((cpsr & 0x1f) < 4) {
     pc = vbar_el1 + 0x400;
   }
-  vcpu_zone->rw.regs.pc = pc;
-  vcpu_zone->rw.regs.cpsr = vcpu_zone->rw.regs.cpsr & 0xffffffe0;
-  vcpu_zone->rw.regs.cpsr = vcpu_zone->rw.regs.cpsr | 0x3c5;
+  ACCESS(rw, regs.pc) = pc;
+  ACCESS(rw, regs.cpsr) = ACCESS(rw, regs.cpsr) & 0xffffffe0;
+  ACCESS(rw, regs.cpsr) = ACCESS(rw, regs.cpsr) | 0x3c5;
 }
