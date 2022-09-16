@@ -105,10 +105,10 @@ static hv_return_t _hv_vcpu_config_get_feature_regs(
   feature_regs->ctr_el0 = MODIFY_FLAGS_CTR_EL0(ACCESS(caps, ctr_el0));
   feature_regs->dczid_el0 = MODIFY_FLAGS_DCZID_EL0(ACCESS(caps, dczid_el0));
   feature_regs->clidr_el1 = MODIFY_FLAGS_CLIDR_EL1(ACCESS(caps, clidr_el1));
-  if (get_xnu_version() >= HV_VERSION_XNU_21) {
-    static_assert(sizeof(feature_regs->ccsidr_el1_inst) == sizeof(caps->v21.ccsidr_el1_inst), "ccsidr_el1_inst size");
+  if (get_xnu_version() >= HV_VERSION_XNU_21_6) {
+    static_assert(sizeof(feature_regs->ccsidr_el1_inst) == sizeof(caps->v216.ccsidr_el1_inst), "ccsidr_el1_inst size");
     memcpy(feature_regs->ccsidr_el1_inst, ACCESS(caps, ccsidr_el1_inst), sizeof(feature_regs->ccsidr_el1_inst));
-    static_assert(sizeof(feature_regs->ccsidr_el1_data_or_unified) == sizeof(caps->v21.ccsidr_el1_data_or_unified), "ccsidr_el1_data_or_unified size");
+    static_assert(sizeof(feature_regs->ccsidr_el1_data_or_unified) == sizeof(caps->v216.ccsidr_el1_data_or_unified), "ccsidr_el1_data_or_unified size");
     memcpy(feature_regs->ccsidr_el1_data_or_unified, ACCESS(caps, ccsidr_el1_data_or_unified), sizeof(feature_regs->ccsidr_el1_data_or_unified));
   }
   return 0;
@@ -439,13 +439,13 @@ hv_return_t hv_vcpu_set_simd_fp_reg(hv_vcpu_t vcpu, hv_simd_fp_reg_t reg,
 static bool find_sys_reg(hv_sys_reg_t sys_reg, uint64_t* offset, uint64_t* sync_mask) {
   uint64_t o = 0;
   uint64_t f = 0;
-  if (get_xnu_version() == HV_VERSION_XNU_20) {
+  if (get_xnu_version() >= HV_VERSION_XNU_20_4 && get_xnu_version() <= HV_VERSION_XNU_20_6) {
     switch (sys_reg) {
 #include "sysreg_offsets_xnu_20.h"
       default:
         return false;
     }
-  } else if (get_xnu_version() == HV_VERSION_XNU_21) {
+  } else if (get_xnu_version() == HV_VERSION_XNU_21_6) {
     switch (sys_reg) {
 #include "sysreg_offsets_xnu_21.h"
       default:
