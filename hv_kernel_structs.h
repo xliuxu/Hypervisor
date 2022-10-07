@@ -34,7 +34,7 @@ static int _get_xnu_version(void) {
     return 0; // not yet supported
   } else if (__builtin_available(iOS 15, macOS 12, watchOS 8, tvOS 15, bridgeOS 6, *)) {
     return HV_VERSION_XNU_21_6;
-  } else if (__builtin_available(iOS 14.6, macOS 11.4, watchOS 7.5, tvOS 14.6, bridgeOS 5.4, *)) {
+  } else if (__builtin_available(iOS 14.7, macOS 11.5, watchOS 7.6, tvOS 14.7, bridgeOS 5.5, *)) {
     return HV_VERSION_XNU_20_6;
   } else if (__builtin_available(iOS 14, macOS 11, watchOS 7, tvOS 14, bridgeOS 5, *)) {
     return HV_VERSION_XNU_20_4;
