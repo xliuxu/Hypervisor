@@ -2,7 +2,7 @@
 #include <Hypervisor/Hypervisor.h>
 
 // Headers extracted from
-// Kernel_Debug_Kit_12.5_build_21G5027d.dmg/kernel.release.t8101
+// Kernel_Debug_Kit_11.3_build_20E232.dmg
 
 // type lookup hv_vcpu_t
 // type lookup arm_guest_context_t
@@ -18,7 +18,7 @@ typedef struct {
   uint64_t csselr_el1;
   uint64_t apstate;
   uint64_t afpcr_el0;
-} arm_guest_shared_sysregs_21_t;
+} arm_guest_shared_sysregs_20_t;
 
 typedef struct {
   uint64_t ttbr0_el1;
@@ -42,8 +42,7 @@ typedef struct {
   uint64_t cntv_ctl_el0;
   uint64_t cntp_ctl_el0;
   uint64_t cntkctl_el1;
-  uint64_t ich_vmcr_el2;
-} arm_guest_banked_sysregs_21_t;
+} arm_guest_banked_sysregs_20_t;
 
 typedef struct {
   uint64_t hcr_el2;
@@ -53,20 +52,19 @@ typedef struct {
   uint64_t vmpidr_el2;
   uint64_t vpidr_el2;
   uint64_t virtual_timer_offset;
+  uint64_t ich_hcr_el2;
   uint64_t hfgrtr_el2;
   uint64_t hfgwtr_el2;
   uint64_t hfgitr_el2;
   uint64_t hdfgrtr_el2;
   uint64_t hdfgwtr_el2;
-  uint64_t cnthctl_el2;
   uint64_t timer;
   uint64_t vmkeyhi_el2;
   uint64_t vmkeylo_el2;
   uint64_t apsts_el1;
-  uint64_t ich_hcr_el2;
-  uint64_t ich_lr_el2[8];
   uint64_t host_debug;
-} arm_guest_controls_21_t;
+  uint64_t state_used;
+} arm_guest_controls_20_t;
 
 typedef struct {
   struct {
@@ -81,7 +79,7 @@ typedef struct {
   uint64_t osdtrrx_el1;
   uint64_t osdtrtx_el1;
   uint8_t dbgclaim_el1;
-} arm_guest_dbgregs_21_t;
+} arm_guest_dbgregs_20_t;
 
 typedef struct {
   uint64_t amx_state_t_el1;
@@ -141,14 +139,7 @@ typedef struct {
   uint64_t sprr_uperm_sh5_el1;
   uint64_t sprr_uperm_sh6_el1;
   uint64_t sprr_uperm_sh7_el1;
-  uint64_t acfg_el1;
-  uint64_t jrange_el1;
-  uint64_t jctl_el1;
-  uint64_t japiakeyhi_el1;
-  uint64_t japiakeylo_el1;
-  uint64_t japibkeyhi_el1;
-  uint64_t japibkeylo_el1;
-} arm_guest_extregs_21_t;
+} arm_guest_extregs_20_t;
 
 typedef struct {
   uint8_t __res_00_20[32];
@@ -186,16 +177,7 @@ typedef struct {
   uint64_t cntv_ctl_el0;
   uint64_t cntp_cval_el0;
   uint64_t cntp_ctl_el0;
-  uint64_t scxtnum_el1;
-  uint64_t tfsr_el1;
-  uint8_t __res_198_1a8[16];
-  uint64_t cntpoff_el2;
-  uint8_t __res_1b0_1b8[8];
-  uint64_t hfgrtr_el2;
-  uint64_t hfgwtr_el2;
-  uint64_t hfgitr_el2;
-  uint64_t hdfgrtr_el2;
-  uint64_t hdfgwtr_el2;
+  uint8_t __res_188_1e0[88];
   uint64_t zcr_el1;
   uint8_t __res_1e8_200[24];
   uint64_t ttbr0_el1;
@@ -232,7 +214,7 @@ typedef struct {
   uint8_t __res_850_880[48];
   uint64_t trfcr_el1;
   uint8_t __res_888_1000[1912];
-} arm_vncr_context_21_t;
+} arm_vncr_context_20_t;
 
 typedef struct {
   uint8_t __res_000_008[8];
@@ -271,7 +253,7 @@ typedef struct {
   uint64_t apl_lrtmr_el2;
   uint64_t apl_intenable_el2;
   uint8_t __res_410_1000[3056];
-} apple_vncr_context_21_t;
+} apple_vncr_context_20_t;
 
 typedef union {
   struct {
@@ -296,18 +278,18 @@ typedef union {
         } neon;
       };
     };
-    arm_guest_shared_sysregs_21_t shared_sysregs;
-    arm_guest_banked_sysregs_21_t banked_sysregs;
-    arm_guest_dbgregs_21_t dbgregs;
-    volatile arm_guest_controls_21_t controls;
+    arm_guest_shared_sysregs_20_t shared_sysregs;
+    arm_guest_banked_sysregs_20_t banked_sysregs;
+    arm_guest_dbgregs_20_t dbgregs;
+    volatile arm_guest_controls_20_t controls;
     volatile uint64_t state_dirty;
     uint64_t guest_tick_count;
-    arm_guest_extregs_21_t extregs;
-    arm_vncr_context_21_t vncr;
-    apple_vncr_context_21_t avncr;
+    arm_guest_extregs_20_t extregs;
+    arm_vncr_context_20_t vncr;
+    apple_vncr_context_20_t avncr;
   };
   uint8_t page[16384];
-} arm_guest_rw_context_21_t;
+} arm_guest_rw_context_20_t;
 
 typedef struct {
   uint32_t vmexit_reason;
@@ -315,22 +297,18 @@ typedef struct {
   uint32_t vmexit_instr;
   uint64_t vmexit_far;
   uint64_t vmexit_hpfar;
-} arm_guest_vmexit_21_t;
+} arm_guest_vmexit_20_t;
 
 typedef union {
   struct {
     uint64_t ver;
-    arm_guest_vmexit_21_t exit;
-    arm_guest_controls_21_t controls;
+    arm_guest_vmexit_20_t exit;
+    arm_guest_controls_20_t controls;
     uint64_t state_valid;
     uint64_t state_dirty;
-    uint64_t state_used;
-    uint32_t ich_vtr_el2;
-    uint32_t ich_misr_el2;
-    uint32_t ich_elrsr_el2;
   };
   uint8_t page[16384];
-} arm_guest_ro_context_21_t;
+} arm_guest_ro_context_20_t;
 
 typedef struct {
   uint64_t cptr_el2;
@@ -344,59 +322,52 @@ typedef struct {
   uint64_t vmexit_ticks;
   uint64_t vncr_el2;
   uint64_t avncr_el2;
-  uint64_t ich_ap0r0_el2;
-  uint64_t ich_ap1r0_el2;
   vm_map_t guest_map;
   bool flush_local_tlb;
   uint64_t actlr_en_mdsb;
-} arm_host_context_21_t;
+} arm_host_context_20_t;
 
 typedef struct {
-  arm_guest_rw_context_21_t rw;
-  arm_guest_ro_context_21_t ro;
-  arm_host_context_21_t priv;
-} arm_guest_context_21_t;
+  arm_guest_rw_context_20_t rw;
+  arm_guest_ro_context_20_t ro;
+  arm_host_context_20_t priv;
+} arm_guest_context_20_t;
 
 typedef struct {
-    uint64_t api;
-    uint64_t vcpumax;
-    uint64_t control_hcr;
-    uint64_t control_hacr;
-    uint64_t control_cptr;
-    uint64_t control_mdcr;
-    uint64_t control_ich_hcr;
-    uint64_t control_vmpidr;
-    uint64_t control_vpidr;
-    uint64_t control_virtual_timer_offset;
-    uint64_t control_timer;
-    uint64_t control_vmkeyhi;
-    uint64_t control_vmkeylo;
-    uint64_t control_apsts;
-    uint64_t control_state_used;
-    uint64_t control_hfgrtr;
-    uint64_t control_hfgwtr;
-    uint64_t control_hfgitr;
-    uint64_t control_hdfgrtr;
-    uint64_t control_hdfgwtr;
-    uint64_t control_cnthctl;
-    uint64_t ctr_el0;
-    uint64_t dczid_el0;
-    uint64_t clidr_el1;
-    uint64_t ccsidr_el1_inst[8];
-    uint64_t ccsidr_el1_data_or_unified[8];
-    uint64_t id_aa64dfr0_el1;
-    uint64_t id_aa64dfr1_el1;
-    uint64_t id_aa64isar0_el1;
-    uint64_t id_aa64isar1_el1;
-    uint64_t id_aa64mmfr0_el1;
-    uint64_t id_aa64mmfr1_el1;
-    uint64_t id_aa64mmfr2_el1;
-    uint64_t id_aa64pfr0_el1;
-    uint64_t id_aa64pfr1_el1;
-    uint8_t gic_npie_active_pending_bug;
-    uint64_t ipa_bits_4k;
-    uint64_t ipa_bits_16k;
-} hv_capabilities_21_t;
+  uint64_t api;
+  uint64_t vcpumax;
+  uint64_t control_hcr;
+  uint64_t control_hacr;
+  uint64_t control_cptr;
+  uint64_t control_mdcr;
+  uint64_t control_vmpidr;
+  uint64_t control_vpidr;
+  uint64_t control_virtual_timer_offset;
+  uint64_t control_timer;
+  uint64_t control_vmkeyhi;
+  uint64_t control_vmkeylo;
+  uint64_t control_apsts;
+  uint64_t control_state_used;
+  uint64_t control_hfgrtr;
+  uint64_t control_hfgwtr;
+  uint64_t control_hfgitr;
+  uint64_t control_hdfgrtr;
+  uint64_t control_hdfgwtr;
+  uint64_t ctr_el0;
+  uint64_t dczid_el0;
+  uint64_t clidr_el1;
+  uint64_t ccsidr_el1_inst[8];
+  uint64_t ccsidr_el1_data_or_unified[8];
+  uint64_t id_aa64dfr0_el1;
+  uint64_t id_aa64dfr1_el1;
+  uint64_t id_aa64isar0_el1;
+  uint64_t id_aa64isar1_el1;
+  uint64_t id_aa64mmfr0_el1;
+  uint64_t id_aa64mmfr1_el1;
+  uint64_t id_aa64mmfr2_el1;
+  uint64_t id_aa64pfr0_el1;
+  uint64_t id_aa64pfr1_el1;
+} hv_capabilities_20_t;
 
-#define HV_XNU_21_6_MAGIC (0x206879700000000e)
-#define HV_VERSION_XNU_21_6 (216)
+#define HV_XNU_20_MAGIC (0x2068797000000009)
+#define HV_VERSION_XNU_20 (20)
