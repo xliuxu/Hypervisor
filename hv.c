@@ -931,3 +931,56 @@ static void deliver_uncategorized_exception(struct hv_vcpu_data* vcpu_data) {
   ACCESS(rw, regs.cpsr) = ACCESS(rw, regs.cpsr) & 0xffffffe0;
   ACCESS(rw, regs.cpsr) = ACCESS(rw, regs.cpsr) | 0x3c5;
 }
+
+extern void *_os_object_alloc(const void *cls, size_t size);
+
+hv_vm_config_t hv_vm_config_create(void) {
+  struct hv_vm_config_private *_config = _os_object_alloc(NULL, sizeof(struct hv_vm_config_private));
+  _config->min_ipa = 0;
+  _config->ipa_size = 0;
+  _config->granule = 0;
+  _config->isa = 1;
+  return (hv_vm_config_t)_config;
+}
+
+hv_return_t _hv_vm_config_set_isa(hv_vm_config_t config, uint32_t isa) {
+  struct hv_vm_config_private *_config = (struct hv_vm_config_private *)config;
+  if (config == NULL) {
+    return HV_BAD_ARGUMENT;
+  }
+  _config->isa = isa;
+  return 0;
+}
+
+hv_return_t _hv_vcpu_get_actlr(hv_vcpu_t vcpu, uint64_t* value) {
+  hv_return_t err;
+  struct hv_vcpu_data* vcpu_data = &vcpus[vcpu];
+  struct hv_vcpu_zone* vcpu_zone = vcpu_data->vcpu_zone;
+  arm_guest_ro_context_t *ro = &vcpu_zone->ro;
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
+  const uint64_t sync_mask = 0x1;
+  if ((ACCESS(ro, state_valid) & sync_mask) == 0) {
+    if ((err = hv_trap(HV_CALL_VCPU_SYSREGS_SYNC, 0)) != 0) {
+      return err;
+    }
+  }
+  *value = ACCESS(rw, banked_sysregs.actlr_el1);
+  return 0;
+}
+
+hv_return_t _hv_vcpu_set_actlr(hv_vcpu_t vcpu, uint64_t value) {
+  hv_return_t err;
+  struct hv_vcpu_data* vcpu_data = &vcpus[vcpu];
+  struct hv_vcpu_zone* vcpu_zone = vcpu_data->vcpu_zone;
+  arm_guest_ro_context_t *ro = &vcpu_zone->ro;
+  arm_guest_rw_context_t *rw = &vcpu_zone->rw;
+  const uint64_t sync_mask = 0x1;
+  if ((ACCESS(ro, state_valid) & sync_mask) == 0) {
+    if ((err = hv_trap(HV_CALL_VCPU_SYSREGS_SYNC, 0)) != 0) {
+      return err;
+    }
+  }
+  ACCESS(rw, banked_sysregs.actlr_el1) = value;
+  ACCESS(rw, state_dirty) |= sync_mask;
+  return 0;
+}
