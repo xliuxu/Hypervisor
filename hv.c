@@ -399,7 +399,7 @@ hv_return_t hv_vcpu_set_reg(hv_vcpu_t vcpu, hv_reg_t reg, uint64_t value) {
   if (reg < HV_REG_FP) {
     ACCESS(rw, regs.x[reg]) = value;
   } else if (reg == HV_REG_FP) {
-    ACCESS(rw, regs.lr) = value;
+    ACCESS(rw, regs.fp) = value;
   } else if (reg == HV_REG_LR) {
     ACCESS(rw, regs.lr) = value;
   } else if (reg == HV_REG_PC) {
