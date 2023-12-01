@@ -445,9 +445,9 @@ static bool find_sys_reg(hv_sys_reg_t sys_reg, uint64_t* offset, uint64_t* sync_
       default:
         return false;
     }
-  } else if (get_xnu_version() == HV_VERSION_XNU_21) {
+  } else if (get_xnu_version() == HV_VERSION_XNU_21 || get_xnu_version() == HV_VERSION_XNU_22) {
     switch (sys_reg) {
-#include "sysreg_offsets_xnu_21.h"
+#include "sysreg_offsets_xnu_21_22.h"
       default:
         return false;
     }
