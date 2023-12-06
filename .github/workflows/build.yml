@@ -1,0 +1,18 @@
+name: Extract Hypervisor dyld
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-13-xlarge
+    steps:
+      - name: Extract
+        run: |
+          ls -lath /System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e
+          HOMEBREW_NO_AUTO_UPDATE=1 brew install keith/formulae/dyld-shared-cache-extractor
+          dyld-shared-cache-extractor /System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e /tmp/dylds
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: Hypervisor.framework
+          path: /tmp/dylds/System/Library/Frameworks/Hypervisor.framework/
