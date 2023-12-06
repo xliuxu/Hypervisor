@@ -16,6 +16,9 @@ template = """case {}:
 """
 outstr = ""
 for entry in indata:
+    if entry[0] not in headermap:
+        print("Unknown register: {}".format(hex(entry[0])))
+        continue
     regname = headermap[entry[0]]
     outstr += template.format(regname, hex(entry[1]), hex(entry[2]))
 with open("../sysreg_offsets.h", "w") as outfile:

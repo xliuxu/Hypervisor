@@ -1,0 +1,28 @@
+name: Extract Hypervisor dyld
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-13-xlarge
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with :
+          show-progress: false
+      - name: Extract
+        run: |
+          ls -lath /System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e
+          # HOMEBREW_NO_AUTO_UPDATE=1 brew install keith/formulae/dyld-shared-cache-extractor
+          # dyld-shared-cache-extractor /System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e /tmp/dylds
+          pushd tools
+          sh build_get_sysreg_offsets.sh
+          ./get_sysreg_offsets > sysreg_offsets.txt
+          python gen_sysreg_offsets.py
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: sysreg_output
+          path: |
+            /tools/sysreg_offsets.txt
+            sysreg_offsets.h

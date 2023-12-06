@@ -2,8 +2,8 @@
 @import Hypervisor;
 int main() {
   // 12.3.1
-  const uint64_t kHvVcpuGetSysRegAddr = 0x00000001e383f020ull;
-  const uint64_t kFindSysRegAddr = 0x00000001e383f314ull;
+  const uint64_t kHvVcpuGetSysRegAddr = 0x00000001e7f1da6cull;
+  const uint64_t kFindSysRegAddr = 0x00000001e7f1dd60ull;
   int64_t find_sys_reg_offset = kFindSysRegAddr - kHvVcpuGetSysRegAddr;
   uint64_t get_sys_reg_addr = (uint64_t)&hv_vcpu_get_sys_reg;
   bool (*find_sys_reg)(uint32_t reg, uint64_t * offset, uint64_t * flags) =
